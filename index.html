@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOH Admin | Control Center</title>
+    
+    <link rel="manifest" href="admin-manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { 
+            background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.95)), url('control-bg.jpg');
+            background-size: cover; 
+            background-attachment: fixed;
+            color: #fff; 
+            font-family: 'Inter', sans-serif; 
+            padding: 20px; 
+            min-height: 100vh;
+        }
+        .order-card { 
+            background: rgba(18, 18, 18, 0.95); 
+            border-radius: 30px; 
+            border: 1px solid rgba(255,255,255,0.05); 
+            padding: 30px; 
+            transition: 0.3s; 
+        }
+        .order-card:hover { border-color: #1DB954; }
+        .status-btn { 
+            background: #1DB954; 
+            color: black; 
+            font-weight: 900; 
+            font-size: 10px; 
+            padding: 12px; 
+            border-radius: 99px; 
+            text-transform: uppercase; 
+            width: 100%; 
+            margin-top: 20px; 
+            transition: 0.2s;
+        }
+        .status-btn:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <header class="flex justify-between items-center mb-10 max-w-6xl mx-auto py-8">
+        <div>
+            <h1 class="text-4xl font-black italic tracking-tighter">CONTROL CENTER</h1>
+            <p class="text-gray-500 text-[10px] font-bold uppercase tracking-widest">Live Kitchen Feed</p>
+        </div>
+        <div class="bg-zinc-900 px-8 py-4 rounded-3xl border border-white/5 text-center">
+            <p class="text-[9px] font-black text-gray-500 uppercase mb-1">Total Sales</p>
+            <span id="sales" class="text-2xl font-black text-spotGreen">0</span> <span class="text-xs font-bold text-spotGreen">ETB</span>
+        </div>
+    </header>
+
+    <div id="grid" class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto pb-20"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDjtvENDE6JD2gntFdTMuljt8ojaLyW_lg",
+            authDomain: "moh-coffe.firebaseapp.com",
+            databaseURL: "https://moh-coffe-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "moh-coffe",
+            appId: "1:257455436275:web:b6af25bbc61803b7a02286"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        onValue(ref(db, 'orders'), (snapshot) => {
+            const data = snapshot.val();
+            const grid = document.getElementById('grid');
+            const salesEl = document.getElementById('sales');
+            grid.innerHTML = '';
+            let total = 0;
+
+            if (data) {
+                // Sort by newest first
+                Object.keys(data).sort((a,b) => data[b].timestamp - data[a].timestamp).forEach(id => {
+                    const o = data[id];
+                    if(o.status === "Paid") total += Number(o.price);
+                    
+                    grid.innerHTML += `
+                        <div class="order-card">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-[10px] font-black uppercase ${o.status === 'Pending' ? 'text-yellow-500' : 'text-spotGreen'}">${o.status}</span>
+                                <span class="text-[9px] text-gray-600">${new Date(o.timestamp).toLocaleTimeString()}</span>
+                            </div>
+                            <h3 class="text-xl font-black">${o.item}</h3>
+                            <p class="text-xs text-gray-500 mb-6">${o.variant} | Loc: ${o.location}</p>
+                            <div class="mb-4">
+                                <p class="text-sm font-black text-white">${o.customer}</p>
+                                <p class="text-xs text-gray-500">${o.phone || 'No phone provided'}</p>
+                            </div>
+                            <div class="text-2xl font-black">${o.price} ETB</div>
+                            
+                            <button onclick="markPaid('${id}')" class="status-btn">Mark Paid</button>
+                            <button onclick="deleteOrder('${id}')" class="w-full text-[9px] font-bold text-red-500 mt-4 uppercase tracking-widest hover:text-red-400">Delete Order</button>
+                        </div>
+                    `;
+                });
+            }
+            salesEl.innerText = total;
+        });
+
+        window.markPaid = (id) => update(ref(db, `orders/${id}`), { status: "Paid" });
+        window.deleteOrder = (id) => { 
+            if(confirm("Are you sure you want to delete this order?")) {
+                remove(ref(db, `orders/${id}`)); 
+            }
+        };
+
+        // Initialize Service Worker for PWA
+        if ('serviceWorker' in navigator) { 
+            navigator.serviceWorker.register('sw.js').catch(()=>{}); 
+        }
+    </script>
+</body>
+</html>
